@@ -80,36 +80,35 @@ def dream_interpretation(request):
     
     elif request.method == 'POST':
         try:
-            # Extract data from request
-            data = request.data
-            philosophy = data.get('philosophy', '')
-            gender = data.get('gender', '')
-            dream_type = data.get('dream_type', [])
-            relation1 = data.get('relation1', [])
-            relation2 = data.get('relation2', [])
-            relation3 = data.get('relation3', [])
-            description = data.get('description', '')
-
-            # Convert string values to lists if necessary
+            # Try to get data from either POST body or query parameters
+            data = request.data if request.data else request.query_params
+            
+            # Clean the data - remove quotes from string values
+            philosophy = data.get('philosophy', '').strip('"')
+            gender = data.get('gender', '').strip('"')
+            
+            # Handle dream_type list
+            dream_type = data.get('dream_type', '[]')
             if isinstance(dream_type, str):
-                dream_type = [dream_type]
-            if isinstance(relation1, str):
-                relation1 = [relation1]
-            if isinstance(relation2, str):
-                relation2 = [relation2]
-            if isinstance(relation3, str):
-                relation3 = [relation3]
+                dream_type = dream_type.strip('[]').replace('"', '').split(',')
+                dream_type = [item.strip() for item in dream_type if item.strip()]
+            
+            # Handle relation lists
+            def parse_relation(rel_str):
+                if not rel_str or rel_str == '[]':
+                    return []
+                if isinstance(rel_str, str):
+                    rel_str = rel_str.strip('[]').replace('"', '').split(',')
+                    return [item.strip() for item in rel_str if item.strip()]
+                return rel_str
 
-            # Validate required fields
-            """
-            if not all([philosophy, gender, dream_type, description]):
-                return Response({
-                    "error": "Missing required fields. Please provide philosophy, gender, dream_type, and description."
-                }, status=status.HTTP_400_BAD_REQUEST)
-            """
+            relation1 = parse_relation(data.get('relation1', '[]'))
+            relation2 = parse_relation(data.get('relation2', '[]'))
+            relation3 = parse_relation(data.get('relation3', '[]'))
+            
+            description = data.get('description', '').strip('"')
 
             # Call the initialize function
-
             interpretation = initialize(
                 philosophy, 
                 gender, 
@@ -128,5 +127,8 @@ def dream_interpretation(request):
             # Add more detailed error information
             return Response({
                 "error": f"An error occurred: {str(e)}",
-                "data_received": request.data
+                "data_received": {
+                    "query_params": request.query_params,
+                    "body": request.data
+                }
             }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
